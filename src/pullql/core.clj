@@ -35,14 +35,14 @@
 
   (parse '[:human/name :human/starships])
   
-  (parse '{:human [:human/name
-                   {:human/starships [:ship/name :ship/class]}]})
+  (parse '[:human/name
+           {:human/starships [:ship/name :ship/class]}])
 
   (time
-   (parse-memoized '{:human [[:db/id 1002]
-                             :human/name
-                             {:human/starships [[:ship/name "Anubis"]
-                                                :ship/class]}]})))
+   (parse-memoized '[[:db/id 1002]
+                     :human/name
+                     {:human/starships [[:ship/name "Anubis"]
+                                        :ship/class]}])))
 
 ;; INTERPRETER
 
@@ -51,11 +51,23 @@
 
 (defmulti ^:private impl (fn [ctx node] (first node)))
 
+(defn- pull-attr
+  ([db read-fn attr]
+   (if (is-attr? db attr :db.type/derived)
+     (read-fn attr db nil nil)
+     (d/datoms db :aevt attr)))
+  ([db read-fn attr eids]
+   (if (is-attr? db attr :db.type/derived)
+     (read-fn attr db eids nil)
+     (->> (d/datoms db :aevt attr)
+          (sequence (filter (fn [^Datom d] (contains? eids (.-e d)))))))))
+
 (defn- pull-pattern
-  ([db pattern] (pull-pattern db pattern #{} true))
-  ([db pattern eids] (pull-pattern db pattern eids false))
-  ([db pattern eids root?]
+  ([db read-fn pattern] (pull-pattern db read-fn pattern #{} true))
+  ([db read-fn pattern eids] (pull-pattern db read-fn pattern eids false))
+  ([db read-fn pattern eids root?]
    (let [ctx {:db         db
+              :read-fn    read-fn
               :entities   {}
               :root?      root?
               :eids       eids
@@ -65,22 +77,22 @@
 (defmethod impl :pattern [ctx [_ specs]]
   (reduce impl ctx specs))
 
-(defmethod impl :attribute [{:keys [db eids root?] :as ctx} [_ attr]]
+(defmethod impl :attribute [{:keys [db read-fn eids root?] :as ctx} [_ attr]]
   (let [datoms     (if root?
-                     (d/datoms db :aevt attr)
-                     (sequence (filter (fn [^Datom d] (contains? eids (.-e d)))) (d/datoms db :aevt attr)))
+                     (pull-attr db read-fn attr)
+                     (pull-attr db read-fn attr eids))
         with-datom (if (is-attr? db attr :db.type/ref)
                      (fn [entities ^Datom d] (update-in entities [(.-e d) attr] conj (.-v d)))
                      (fn [entities ^Datom d] (assoc-in entities [(.-e d) attr] (.-v d))))]
     (update ctx :entities #(reduce with-datom % datoms))))
 
-(defmethod impl :expand [{:keys [db eids root?] :as ctx} [_ map-spec]]
+(defmethod impl :expand [{:keys [db read-fn eids root?] :as ctx} [_ map-spec]]
   (let [[attr pattern]    (first map-spec)
         datoms            (if root?
-                            (d/datoms db :aevt attr)
-                            (sequence (filter (fn [^Datom d] (contains? eids (.-e d)))) (d/datoms db :aevt attr)))
+                            (pull-attr db read-fn attr)
+                            (pull-attr db read-fn attr eids))
         child-eids        (into #{} (map (fn [^Datom d] (.-v d))) datoms)
-        child-ctx         (pull-pattern db pattern child-eids)
+        child-ctx         (pull-pattern db read-fn pattern child-eids)
         child-filter      (:eid-filter child-ctx)
         matching-children (select-keys (:entities child-ctx) (child-filter (:eids child-ctx)))
         with-datom        (if (is-attr? db attr :db.cardinality/many)
@@ -94,14 +106,16 @@
                                 entities)))]
     (update ctx :entities #(reduce with-datom % datoms))))
 
-(defmethod impl :clause [{:keys [db] :as ctx} [_ clause]]
+(defmethod impl :clause [{:keys [db read-fn] :as ctx} [_ clause]]
   (let [[_ data-pattern] clause
         [attr v]         data-pattern
         indexed?         (is-attr? db attr :db/index)
-        matching-datoms  (if indexed?
-                           (d/datoms db :avet attr v)
-                           (->> (d/datoms db :aevt attr)
-                                (sequence (filter (fn [^Datom d] (= (.-v d) v))))))
+        derived?         (is-attr? db attr :db.type/derived)
+        matching-datoms  (cond
+                           indexed? (d/datoms db :avet attr v)
+                           derived? (read-fn attr db nil #{v}) ; @TODO deal with eids here?
+                           :else    (->> (d/datoms db :aevt attr)
+                                         (sequence (filter (fn [^Datom d] (= (.-v d) v))))))
         with-datom       (if (is-attr? db attr :db.type/ref)
                            (fn [entities ^Datom d] (update-in entities [(.-e d) attr] conj (.-v d)))
                            (fn [entities ^Datom d] (assoc-in entities [(.-e d) attr] (.-v d))))]
@@ -111,11 +125,13 @@
 
 ;; PUBLIC API
 
-(defn pull-all [db query]
-  (let [pattern           (parse-memoized query)
-        ctx               (pull-pattern db pattern)
-        ;; keep only matching entities
-        entity-filter     (:eid-filter ctx)
-        entities          (:entities ctx)
-        matching-entities (into [] (map entities) (entity-filter (into #{} (keys entities))))]
-    matching-entities))
+(defn pull-all
+  ([db query] (pull-all db query (fn [attr db eids] (throw (ex-info "No read-fn specified." {:attr attr})))))
+  ([db query read-fn]
+   (let [pattern           (parse-memoized query)
+         ctx               (pull-pattern db read-fn pattern)
+         ;; keep only matching entities
+         entity-filter     (:eid-filter ctx)
+         entities          (:entities ctx)
+         matching-entities (into [] (map entities) (entity-filter (into #{} (keys entities))))]
+     matching-entities)))
