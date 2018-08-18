@@ -81,7 +81,7 @@
   (let [datoms     (if root?
                      (pull-attr db read-fn attr)
                      (pull-attr db read-fn attr eids))
-        with-datom (if (is-attr? db attr :db.type/ref)
+        with-datom (if (is-attr? db attr :db.cardinality/many)
                      (fn [entities ^Datom d] (update-in entities [(.-e d) attr] conj (.-v d)))
                      (fn [entities ^Datom d] (assoc-in entities [(.-e d) attr] (.-v d))))]
     (update ctx :entities #(reduce with-datom % datoms))))
