@@ -115,6 +115,14 @@
 (defn pull-all
   ([db query] (pull-all db query (fn [attr db eids] (throw (ex-info "No read-fn specified." {:attr attr})))))
   ([db query read-fn]
+   (if-not (map? query)
+     (pull-all db ::default-alias query read-fn)
+     (as-> query aliases
+       (reduce-kv
+        (fn [result alias sub-query]
+          (assoc result alias (pull-all db alias sub-query read-fn)))
+        {} aliases))))
+  ([db alias query read-fn]
    (let [pattern           (parse-memoized query)
          ctx               (pull-pattern db read-fn pattern)
          ;; keep only matching entities

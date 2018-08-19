@@ -6,8 +6,8 @@ entities, it is between one and two orders of magnitude faster than
 `d/pull-many`. PullQL is thus intended to fill a similar role as
 GraphQL. 
 
-In addition to the basic pull functionality, PullQL supports filters
-and derived attributes.
+In addition to the basic pull functionality, PullQL supports multiple
+top-level queries via aliases, filter clauses and derived attributes.
 
 A previous iteration of this language is described in detail in [0].
 
@@ -20,6 +20,12 @@ A previous iteration of this language is described in detail in [0].
 ;; recursively querying relations
 (pull-all db '[:constellation/name
                {:constellation/scenario [:scenario/name]}])
+			   
+;; multiple top-level queries via aliasing
+(pull-all db '{:structure [:constellation/name 
+                           {:constellation/scenario [:scenario/name]}]
+               :detail    [[:scenario/name "Testszenario"]
+			               {:scenario/discourse [:discourse/name :discourse/niveau]}]})
                
 ;; additionally, PullQL supports filters
 (pull-all db '[[:constellation/name "Fachstationen"]
