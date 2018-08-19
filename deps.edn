@@ -2,7 +2,8 @@
  {org.clojure/clojure {:mvn/version "1.9.0"}}
  :aliases
  {:dev
-  {:extra-deps {clockworks/datascript {:git/url       "git@bitbucket.org:clockworksde/datascript.git"
-                                       :sha           "9767ebfc8e54648a517242d93466390dfe916e30"
-                                       :deps/manifest :deps}
-                criterium             {:mvn/version "0.4.4"}}}}}
+  {:extra-paths ["test"]
+   :extra-deps  {clockworks/datascript {:git/url       "git@bitbucket.org:clockworksde/datascript.git"
+                                        :sha           "9767ebfc8e54648a517242d93466390dfe916e30"
+                                        :deps/manifest :deps}
+                 criterium             {:mvn/version "0.4.4"}}}}}

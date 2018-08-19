@@ -8,7 +8,7 @@
 
 ;; GRAMMAR
 
-(s/def ::pattern (s/coll-of ::attr-spec))
+(s/def ::pattern (s/coll-of ::attr-spec :kind vector?))
 (s/def ::attr-spec (s/or :attribute ::attr-name
                          :clause ::clause
                          :expand ::map-spec))
@@ -30,19 +30,6 @@
       conformed)))
 
 (def ^{:arglists '([query])} parse-memoized (memoize parse))
-
-(comment
-
-  (parse '[:human/name :human/starships])
-  
-  (parse '[:human/name
-           {:human/starships [:ship/name :ship/class]}])
-
-  (time
-   (parse-memoized '[[:db/id 1002]
-                     :human/name
-                     {:human/starships [[:ship/name "Anubis"]
-                                        :ship/class]}])))
 
 ;; INTERPRETER
 
