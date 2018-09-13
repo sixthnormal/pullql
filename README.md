@@ -58,22 +58,13 @@ Derived attributes must be annotated as `:db/valueType
 :db.type/derived` in the schema. Definitions for all derived
 attributes are specified via a function:
 
-``` clojure
-(def schema 
-  {:list-price    {}
-   :display-price {:db/valueType :db.type/derived}})
-
-(defn read-fn [attr db eids values]
-  (case attr
-    :display-price (cond-> eids
-	                 
-	                 (map #(->Datom % :list-price (* )) eids))
-	(throw ...)))
-```
+@TODO
 
 ## ClojureScript Support
 
 @TODO
 
-[0][https://www.nikolasgoebel.com/2018/06/26/a-query-language.html]
-[1][http://www.nikolasgoebel.com/2018/03/25/derived-attributes-datascript.html]
+## Sources
+
+- [0][https://www.nikolasgoebel.com/2018/06/26/a-query-language.html]
+- [1][http://www.nikolasgoebel.com/2018/03/25/derived-attributes-datascript.html]
