@@ -1,9 +1,12 @@
 {:deps
  {org.clojure/clojure {:mvn/version "1.9.0"}}
  :aliases
- {:dev
+ {:test
   {:extra-paths ["test"]
-   :extra-deps  {clockworks/datascript {:git/url       "git@bitbucket.org:clockworksde/datascript.git"
-                                        :sha           "9767ebfc8e54648a517242d93466390dfe916e30"
-                                        :deps/manifest :deps}
-                 criterium             {:mvn/version "0.4.4"}}}}}
+   :extra-deps  {com.cognitect/test-runner {:git/url "https://github.com/cognitect-labs/test-runner.git"
+                                            :sha     "028a6d41ac9ac5d5c405dfc38e4da6b4cc1255d5"}
+                 clockworks/datascript     {:git/url       "git@bitbucket.org:clockworksde/datascript.git"
+                                            :sha           "9767ebfc8e54648a517242d93466390dfe916e30"
+                                            :deps/manifest :deps}
+                 criterium                 {:mvn/version "0.4.4"}}
+   :main-opts ["-m" "cognitect.test-runner"]}}}
