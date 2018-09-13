@@ -21,6 +21,15 @@
          (parse '[[:db/id 1002]
                   :human/name
                   {:human/starships [[:ship/name "Anubis"]
+                                     :ship/class]}])))
+
+  (is (= [[:clause [:data-pattern [:db/id 1002]]]
+          [:clause [:data-pattern [:human/name '_]]]
+          [:expand {:human/starships [[:clause [:data-pattern [:ship/name "Anubis"]]]
+                                      [:attribute :ship/class]]}]]
+         (parse '[[:db/id 1002]
+                  [:human/name _]
+                  {:human/starships [[:ship/name "Anubis"]
                                      :ship/class]}]))))
 
 (deftest test-pull-all
@@ -60,6 +69,14 @@
              (pull-all db '[[:human/name "Naomi Nagata"] 
                             {:human/starships [:ship/name :ship/class]}]))))
 
+    (testing "top-level filter clause w/ placeholder"
+      (is (= [#:human{:name      "Naomi Nagata"
+                      :starships '(#:ship{:name "Anubis" :class :ship.class/science-vessel} #:ship{:name "Roci" :class :ship.class/fighter})}
+              #:human{:name "Amos Burton"
+                      :starships '(#:ship{:name "Roci" :class :ship.class/fighter})}]
+             (pull-all db '[[:human/name _]
+                            {:human/starships [:ship/name :ship/class]}]))))
+    
     (testing "nested filter clause"
       (is (= [#:human{:name      "Naomi Nagata"
                       :starships '(#:ship{:name "Roci" :class :ship.class/fighter})}
@@ -68,6 +85,16 @@
              (pull-all db '[:human/name
                             {:human/starships [:ship/name
                                                [:ship/class :ship.class/fighter]]}]))))
+
+    (testing "nested filter clause w/ placeholder"
+      (is (= [#:human{:name      "Naomi Nagata"
+                      :starships '(#:ship{:name "Anubis" :class :ship.class/science-vessel} #:ship{:name "Roci" :class :ship.class/fighter})}
+              #:human{:name      "Amos Burton"
+                      :starships '(#:ship{:name "Roci" :class :ship.class/fighter})}]
+             (pull-all db '[:human/name
+                            {:human/starships [:ship/name
+                                               [:ship/class _]]}]))))
+
     
     (testing "multiple top-level patterns are supported via aliases"
       (let [query-a '[:human/name

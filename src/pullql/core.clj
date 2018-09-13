@@ -98,11 +98,13 @@
         [attr v]         data-pattern
         indexed?         (is-attr? db attr :db/index)
         derived?         (is-attr? db attr :db.type/derived)
+        placeholder?     (= '_ v)
         matching-datoms  (cond
-                           indexed? (d/datoms db :avet attr v)
-                           derived? (read-fn attr db nil #{v}) ; @TODO deal with eids here?
-                           :else    (->> (d/datoms db :aevt attr)
-                                         (sequence (filter (fn [^Datom d] (= (.-v d) v))))))
+                           derived?     (read-fn attr db nil #{v}) ; @TODO deal with eids here?
+                           placeholder? (d/datoms db :aevt attr)
+                           indexed?     (d/datoms db :avet attr v)
+                           :else        (->> (d/datoms db :aevt attr)
+                                             (sequence (filter (fn [^Datom d] (= (.-v d) v))))))
         with-datom       (if (is-attr? db attr :db.type/ref)
                            (fn [entities ^Datom d] (update-in entities [(.-e d) attr] conj (.-v d)))
                            (fn [entities ^Datom d] (assoc-in entities [(.-e d) attr] (.-v d))))]
