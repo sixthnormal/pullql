@@ -36,14 +36,44 @@ A previous iteration of this language is described in detail in [0].
                {:constellation/scenario [:scenario/name
                                          {:scenario/discourse [:discourse/name
 										                       [:discourse/niveau 1]]}]}])
+															   
+;; filters support a wildcard '_', expressing a required attribute
+(pull-all db '[[:constellation/name _]
+               {:constellation/scenario [:scenario/name]}])
+
+(pull-all db '[:constellation/name
+               {:constellation/scenario [:scenario/name
+                                         {:scenario/discourse [:discourse/name
+										                       [:discourse/niveau _]]}]}])
+
 ```
 
 ## Derived Attributes
 
-@TODO
+Derived attributes can be thought of as relations between entities and
+values whose datoms are computed on the fly, rather than being stored
+permanently. A similar implementation is explained in [1].
+
+Derived attributes must be annotated as `:db/valueType
+:db.type/derived` in the schema. Definitions for all derived
+attributes are specified via a function:
+
+``` clojure
+(def schema 
+  {:list-price    {}
+   :display-price {:db/valueType :db.type/derived}})
+
+(defn read-fn [attr db eids values]
+  (case attr
+    :display-price (cond-> eids
+	                 
+	                 (map #(->Datom % :list-price (* )) eids))
+	(throw ...)))
+```
 
 ## ClojureScript Support
 
 @TODO
 
 [0][https://www.nikolasgoebel.com/2018/06/26/a-query-language.html]
+[1][http://www.nikolasgoebel.com/2018/03/25/derived-attributes-datascript.html]
