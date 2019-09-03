@@ -8,10 +8,12 @@
   (is (= [[:attribute :human/name] [:attribute :human/starships]]
          (parse '[:human/name :human/starships])))
 
-  (is (= [[:attribute :human/name]
+  (is (= [[:attribute :db/id]
+          [:attribute :human/name]
           [:expand {:human/starships [[:attribute :ship/name]
                                       [:attribute :ship/class]]}]]
-         (parse '[:human/name
+         (parse '[:db/id
+                  :human/name
                   {:human/starships [:ship/name :ship/class]}])))
 
   (is (= [[:clause [:data-pattern [:db/id 1002]]]
@@ -52,6 +54,10 @@
     (is (= (set (d/q '[:find [(pull ?e [:human/name]) ...] :where [?e :human/name _]] db))
            (set (pull-all db '[:human/name]))))
 
+    (testing "pulling :db/id"
+      (is (= (set (d/q '[:find [(pull ?e [:db/id :human/name]) ...] :where [?e :human/name _]] db))
+             (set (pull-all db '[:db/id :human/name])))))
+
     (testing "recursive resolution of expand patterns"
       ;; @TODO can't compare w/ d/q directly, because order of
       ;; children is different
@@ -65,9 +71,10 @@
 
     (testing "top-level filter clause"
       (is (= [#:human{:name      "Naomi Nagata"
-                      :starships '(#:ship{:name "Anubis" :class :ship.class/science-vessel} #:ship{:name "Roci" :class :ship.class/fighter})}]
+                      :starships '({:db/id 3 :ship/name "Anubis" :ship/class :ship.class/science-vessel}
+                                   {:db/id 2 :ship/name "Roci" :ship/class :ship.class/fighter})}]
              (pull-all db '[[:human/name "Naomi Nagata"] 
-                            {:human/starships [:ship/name :ship/class]}]))))
+                            {:human/starships [:db/id :ship/name :ship/class]}]))))
 
     (testing "top-level filter clause w/ placeholder"
       (is (= [#:human{:name      "Naomi Nagata"

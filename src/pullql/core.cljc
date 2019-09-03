@@ -68,11 +68,9 @@
   (let [datoms     (if root?
                      (pull-attr db read-fn attr)
                      (pull-attr db read-fn attr eids))
-        with-datom (case attr
-                     :db/id (fn [entities ^Datom d] (assoc-in entities [(.-e d) :db/id] (.-e d)))
-                     (if (is-attr? db attr :db.cardinality/many)
-                       (fn [entities ^Datom d] (update-in entities [(.-e d) attr] conj (.-v d)))
-                       (fn [entities ^Datom d] (assoc-in entities [(.-e d) attr] (.-v d)))))]
+        with-datom (if (is-attr? db attr :db.cardinality/many)
+                     (fn [entities ^Datom d] (update-in entities [(.-e d) attr] conj (.-v d)))
+                     (fn [entities ^Datom d] (assoc-in entities [(.-e d) attr] (.-v d))))]
     (update ctx :entities #(reduce with-datom % datoms))))
 
 (defmethod impl :expand [{:keys [db read-fn eids root?] :as ctx} [_ map-spec]]
@@ -84,13 +82,22 @@
         child-ctx         (pull-pattern db read-fn pattern child-eids)
         child-filter      (:eid-filter child-ctx)
         matching-children (select-keys (:entities child-ctx) (child-filter (:eids child-ctx)))
+        ;; Do we need to pull :db/id?
+        pull-eid?         (some #{[:attribute :db/id]} pattern)
+        ;; We wrap (find matching-children <eid>) in order to pull
+        ;; :db/id on-the-fly.
+        find-child        (if pull-eid?
+                            (fn [eid]
+                              (when-some [child (get matching-children eid)]
+                                [eid (assoc child :db/id eid)]))
+                            (partial find matching-children))
         with-datom        (if (is-attr? db attr :db.cardinality/many)
                             (fn [entities ^Datom d]
-                              (if-some [[_ child] (find matching-children (.-v d))]
+                              (if-some [[_ child] (find-child (.-v d))]
                                 (update-in entities [(.-e d) attr] conj child)
                                 entities))
                             (fn [entities ^Datom d]
-                              (if-some [[_ child] (find matching-children (.-v d))]
+                              (if-some [[_ child] (find-child (.-v d))]
                                 (assoc-in entities [(.-e d) attr] child)
                                 entities)))]
     (update ctx :entities #(reduce with-datom % datoms))))
@@ -132,5 +139,10 @@
          ;; keep only matching entities
          entity-filter     (:eid-filter ctx)
          entities          (:entities ctx)
-         matching-entities (into [] (map entities) (entity-filter (into #{} (keys entities))))]
+         ;; do we need to pull :db/id?
+         pull-eid?         (some #{[:attribute :db/id]} pattern)
+         extract-entity    (if pull-eid?
+                             (fn [eid] (assoc (entities eid) :db/id eid))
+                             entities)
+         matching-entities (into [] (map extract-entity) (entity-filter (into #{} (keys entities))))]
      matching-entities)))
