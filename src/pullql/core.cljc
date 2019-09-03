@@ -4,7 +4,7 @@
    [clojure.spec.alpha :as s]
    [datascript.core :as d]
    [datascript.db :as db-internals])
-  (:import [datascript.db Datom]))
+  #?(:clj (:import [datascript.db Datom])))
 
 ;; GRAMMAR
 
@@ -68,9 +68,11 @@
   (let [datoms     (if root?
                      (pull-attr db read-fn attr)
                      (pull-attr db read-fn attr eids))
-        with-datom (if (is-attr? db attr :db.cardinality/many)
-                     (fn [entities ^Datom d] (update-in entities [(.-e d) attr] conj (.-v d)))
-                     (fn [entities ^Datom d] (assoc-in entities [(.-e d) attr] (.-v d))))]
+        with-datom (case attr
+                     :db/id (fn [entities ^Datom d] (assoc-in entities [(.-e d) :db/id] (.-e d)))
+                     (if (is-attr? db attr :db.cardinality/many)
+                       (fn [entities ^Datom d] (update-in entities [(.-e d) attr] conj (.-v d)))
+                       (fn [entities ^Datom d] (assoc-in entities [(.-e d) attr] (.-v d)))))]
     (update ctx :entities #(reduce with-datom % datoms))))
 
 (defmethod impl :expand [{:keys [db read-fn eids root?] :as ctx} [_ map-spec]]
