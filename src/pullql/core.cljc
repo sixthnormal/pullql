@@ -36,18 +36,34 @@
 (defn- is-attr? [db attr property]
   (contains? (db-internals/-attrs-by db property) attr))
 
+(defn- reverse-ref? [attr]
+  (= \_ (nth (name attr) 0)))
+
+(defn reverse-ref [attr]
+  (if (reverse-ref? attr)
+    (keyword (namespace attr) (subs (name attr) 1))
+    (keyword (namespace attr) (str "_" (name attr)))))
+
 (defmulti ^:private impl (fn [ctx node] (first node)))
 
 (defn- pull-attr
   ([db read-fn attr]
-   (if (is-attr? db attr :db.type/derived)
-     (read-fn attr db nil nil)
-     (d/datoms db :aevt attr)))
+   (cond
+     (is-attr? db attr :db.type/derived) (read-fn attr db nil nil)
+     (reverse-ref? attr)                 (->> (d/datoms db :avet (reverse-ref attr))
+                                              (sequence (map (fn [^Datom d]
+                                                               (db-internals/datom (.-v d) attr (.-e d) (.-tx d) (.-added d))))))
+     :else                               (d/datoms db :aevt attr)))
   ([db read-fn attr eids]
-   (if (is-attr? db attr :db.type/derived)
-     (read-fn attr db eids nil)
-     (->> (d/datoms db :aevt attr)
-          (sequence (filter (fn [^Datom d] (contains? eids (.-e d)))))))))
+   (cond
+     (is-attr? db attr :db.type/derived) (read-fn attr db eids nil)
+     (reverse-ref? attr)                 (->> (d/datoms db :avet (reverse-ref attr))
+                                              (sequence (comp
+                                                         (filter (fn [^Datom d] (contains? eids (.-v d))))
+                                                         (map (fn [^Datom d]
+                                                                (db-internals/datom (.-v d) attr (.-e d) (.-tx d) (.-added d)))))))
+     :else                               (->> (d/datoms db :aevt attr)
+                                              (sequence (filter (fn [^Datom d] (contains? eids (.-e d)))))))))
 
 (defn- pull-pattern
   ([db read-fn pattern] (pull-pattern db read-fn pattern #{} true))

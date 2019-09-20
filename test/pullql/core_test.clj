@@ -69,6 +69,19 @@
                             {:human/starships [:ship/name
                                                :ship/class]}]))))
 
+    (testing "resolution of reverse attributes"
+      (is (= [{:ship/name        "Anubis"
+               :human/_starships 1}]
+             (pull-all db '[[:ship/name "Anubis"]
+                            :human/_starships]))))
+
+    (testing "recursive resolution of nested reverse attributes"
+      (is (= [{:ship/name        "Anubis"
+               :human/_starships {:db/id      1
+                                  :human/name "Naomi Nagata"}}]
+             (pull-all db '[[:ship/name "Anubis"]
+                            {:human/_starships [:db/id :human/name]}]))))
+
     (testing "top-level filter clause"
       (is (= [#:human{:name      "Naomi Nagata"
                       :starships '({:db/id 3 :ship/name "Anubis" :ship/class :ship.class/science-vessel}
@@ -79,7 +92,7 @@
     (testing "top-level filter clause w/ placeholder"
       (is (= [#:human{:name      "Naomi Nagata"
                       :starships '(#:ship{:name "Anubis" :class :ship.class/science-vessel} #:ship{:name "Roci" :class :ship.class/fighter})}
-              #:human{:name "Amos Burton"
+              #:human{:name      "Amos Burton"
                       :starships '(#:ship{:name "Roci" :class :ship.class/fighter})}]
              (pull-all db '[[:human/name _]
                             {:human/starships [:ship/name :ship/class]}]))))
