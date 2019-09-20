@@ -146,3 +146,6 @@
                              entities)
          matching-entities (into [] (map extract-entity) (entity-filter (into #{} (keys entities))))]
      matching-entities)))
+
+(defn merge-queries [& qs]
+  (into [] (distinct) (apply concat qs)))
