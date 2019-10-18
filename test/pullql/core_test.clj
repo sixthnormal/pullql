@@ -75,6 +75,14 @@
              (pull-all db '[[:ship/name "Anubis"]
                             :human/_starships]))))
 
+    (testing "constraints on reverse attributes"
+      (is (= [{:ship/name        "Anubis"
+               :human/_starships 1}
+              {:ship/name        "Roci"
+               :human/_starships 4}]
+             (pull-all db '[:ship/name
+                            [:human/_starships _]]))))
+
     (testing "recursive resolution of nested reverse attributes"
       (is (= [{:ship/name        "Anubis"
                :human/_starships {:db/id      1

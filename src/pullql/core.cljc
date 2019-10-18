@@ -123,9 +123,13 @@
         [attr v]         data-pattern
         indexed?         (is-attr? db attr :db/index)
         derived?         (is-attr? db attr :db.type/derived)
+        reverse?         (reverse-ref? attr)
         placeholder?     (= '_ v)
         matching-datoms  (cond
                            derived?     (read-fn attr db nil #{v}) ; @TODO deal with eids here?
+                           reverse?     (->> (d/datoms db :avet (reverse-ref attr))
+                                             (sequence (map (fn [^Datom d]
+                                                              (db-internals/datom (.-v d) attr (.-e d) (.-tx d) (.-added d))))))
                            placeholder? (d/datoms db :aevt attr)
                            indexed?     (d/datoms db :avet attr v)
                            :else        (->> (d/datoms db :aevt attr)
