@@ -36,6 +36,9 @@
 (defn- is-attr? [db attr property]
   (contains? (db-internals/-attrs-by db property) attr))
 
+(defn- is-derived? [db attr]
+  (get-in db [:schema attr :db/derived]))
+
 (defn- reverse-ref? [attr]
   (= \_ (nth (name attr) 0)))
 
@@ -49,21 +52,21 @@
 (defn- pull-attr
   ([db read-fn attr]
    (cond
-     (is-attr? db attr :db.type/derived) (read-fn attr db nil nil)
-     (reverse-ref? attr)                 (->> (d/datoms db :avet (reverse-ref attr))
-                                              (sequence (map (fn [^Datom d]
-                                                               (db-internals/datom (.-v d) attr (.-e d) (.-tx d) (.-added d))))))
-     :else                               (d/datoms db :aevt attr)))
+     (is-derived? db attr) (read-fn attr db nil nil)
+     (reverse-ref? attr)   (->> (d/datoms db :avet (reverse-ref attr))
+                                (sequence (map (fn [^Datom d]
+                                                 (db-internals/datom (.-v d) attr (.-e d) (.-tx d) (.-added d))))))
+     :else                 (d/datoms db :aevt attr)))
   ([db read-fn attr eids]
    (cond
-     (is-attr? db attr :db.type/derived) (read-fn attr db eids nil)
-     (reverse-ref? attr)                 (->> (d/datoms db :avet (reverse-ref attr))
-                                              (sequence (comp
-                                                         (filter (fn [^Datom d] (contains? eids (.-v d))))
-                                                         (map (fn [^Datom d]
-                                                                (db-internals/datom (.-v d) attr (.-e d) (.-tx d) (.-added d)))))))
-     :else                               (->> (d/datoms db :aevt attr)
-                                              (sequence (filter (fn [^Datom d] (contains? eids (.-e d)))))))))
+     (is-derived? db attr) (read-fn attr db eids nil)
+     (reverse-ref? attr)   (->> (d/datoms db :avet (reverse-ref attr))
+                                (sequence (comp
+                                           (filter (fn [^Datom d] (contains? eids (.-v d))))
+                                           (map (fn [^Datom d]
+                                                  (db-internals/datom (.-v d) attr (.-e d) (.-tx d) (.-added d)))))))
+     :else                 (->> (d/datoms db :aevt attr)
+                                (sequence (filter (fn [^Datom d] (contains? eids (.-e d)))))))))
 
 (defn- pull-pattern
   ([db read-fn pattern] (pull-pattern db read-fn pattern #{} true))
@@ -122,11 +125,11 @@
   (let [[_ data-pattern] clause
         [attr v]         data-pattern
         indexed?         (is-attr? db attr :db/index)
-        derived?         (is-attr? db attr :db.type/derived)
+        derived?         (is-derived? db attr)
         reverse?         (reverse-ref? attr)
         placeholder?     (= '_ v)
         matching-datoms  (cond
-                           derived?     (read-fn attr db nil #{v}) ; @TODO deal with eids here?
+                           derived?     (read-fn attr db nil (when-not placeholder? #{v})) ; @TODO deal with eids here?
                            reverse?     (->> (d/datoms db :avet (reverse-ref attr))
                                              (sequence (map (fn [^Datom d]
                                                               (db-internals/datom (.-v d) attr (.-e d) (.-tx d) (.-added d))))))
@@ -144,7 +147,10 @@
 ;; PUBLIC API
 
 (defn pull-all
-  ([db query] (pull-all db query (fn [attr db eids] (throw (ex-info "No read-fn specified." {:attr attr})))))
+  ([db query] (pull-all db query (fn [attr db eids vals]
+                                   (throw (ex-info "No read-fn specified." {:attr attr
+                                                                            :eids eids
+                                                                            :vals vals})))))
   ([db query read-fn]
    (if-not (map? query)
      (pull-all db ::default-alias query read-fn)

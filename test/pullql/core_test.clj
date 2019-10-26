@@ -133,3 +133,42 @@
                 :classes (pull-all db query-b)}
                (pull-all db {:human   query-a
                              :classes query-b})))))))
+
+(deftest test-derived
+  (let [read   (fn [attr db eids values]
+                 (case attr
+                   :ship/price (let [ships   (if (some? eids)
+                                               (d/pull-many db '[:db/id :ship/class] eids)
+                                               (pull-all db '[:db/id :ship/class]))
+                                     ->datom (fn [ship]
+                                               (when-some [price (case (:ship/class ship)
+                                                                   :ship.class/fighter        1000
+                                                                   :ship.class/science-vessel 5000)]
+                                                 (when (or (nil? values)
+                                                           (contains? values price))
+                                                   (d/datom (:db/id ship) :ship/price price (:max-tx db) true))))]
+                                 (->> ships
+                                      (map ->datom)
+                                      (remove nil?)))
+                   []))
+        schema {:ship/name  {}
+                :ship/class {}
+                :ship/price {:db/derived true}}
+        data   [{:ship/name "Roci" :ship/class :ship.class/fighter}
+                {:ship/name "Anubis" :ship/class :ship.class/science-vessel}]
+        db     (-> (d/empty-db schema)
+                   (d/db-with data))]
+    
+    (testing "derived attributes"
+      (is (= #{{:ship/name "Roci" :ship/price 1000}
+               {:ship/name "Anubis" :ship/price 5000}}
+             (set (pull-all db '[:ship/name :ship/price] read)))))
+
+    (testing "clauses can be put on derived attributes as well"
+      (is (= #{{:ship/name "Roci" :ship/price 1000}
+               {:ship/name "Anubis" :ship/price 5000}}
+             (set (pull-all db '[:ship/name
+                                 [:ship/price _]] read))))
+      (is (= #{{:ship/name "Roci" :ship/price 1000}}
+             (set (pull-all db '[:ship/name
+                                 [:ship/price 1000]] read)))))))
