@@ -175,3 +175,18 @@
 
 (defn merge-queries [& qs]
   (into [] (distinct) (apply concat qs)))
+
+(defn derive-from-query
+  [attr query f db eids values]
+  (let [query    (merge-queries query [:db/id])
+        entities (if (some? eids)
+                   (d/pull-many db query eids)
+                   (pull-all db query))
+        ->datom  (fn [entity]
+                   (when-some [v (f entity)]
+                     (when (or (nil? values)
+                               (contains? values v))
+                       (d/datom (:db/id entity) attr v (:max-tx db) true))))]
+    (->> entities
+         (map ->datom)
+         (remove nil?))))

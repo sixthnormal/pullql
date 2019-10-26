@@ -1,7 +1,7 @@
 (ns pullql.core-test
   (:require
    [clojure.test :refer [deftest is testing run-tests]]
-   [pullql.core :refer [parse pull-all]]
+   [pullql.core :refer [parse pull-all derive-from-query]]
    [datascript.core :as d]))
 
 (deftest test-parse
@@ -137,32 +137,40 @@
 (deftest test-derived
   (let [read   (fn [attr db eids values]
                  (case attr
-                   :ship/price (let [ships   (if (some? eids)
-                                               (d/pull-many db '[:db/id :ship/class] eids)
-                                               (pull-all db '[:db/id :ship/class]))
-                                     ->datom (fn [ship]
-                                               (when-some [price (case (:ship/class ship)
-                                                                   :ship.class/fighter        1000
-                                                                   :ship.class/science-vessel 5000)]
-                                                 (when (or (nil? values)
-                                                           (contains? values price))
-                                                   (d/datom (:db/id ship) :ship/price price (:max-tx db) true))))]
-                                 (->> ships
-                                      (map ->datom)
-                                      (remove nil?)))
+                   :ship/price (derive-from-query :ship/price
+                                                  [:db/id :ship/class]
+                                                  (fn [ship]
+                                                    (case (:ship/class ship)
+                                                      :ship.class/fighter        1000
+                                                      :ship.class/science-vessel 5000))
+                                                  db eids values)
                    []))
-        schema {:ship/name  {}
-                :ship/class {}
-                :ship/price {:db/derived true}}
-        data   [{:ship/name "Roci" :ship/class :ship.class/fighter}
-                {:ship/name "Anubis" :ship/class :ship.class/science-vessel}]
+        schema {:human/name      {}
+                :human/starships {:db/valueType   :db.type/ref
+                                  :db/cardinality :db.cardinality/many}
+                :ship/name       {}
+                :ship/class      {}
+                :ship/price      {:db/derived true}}
+        data   [{:human/name      "Naomi Nagata"
+                 :human/starships [{:db/id -1 :ship/name "Roci" :ship/class :ship.class/fighter}
+                                   {:ship/name "Anubis" :ship/class :ship.class/science-vessel}]}
+                {:human/name      "Amos Burton"
+                 :human/starships [-1]}
+                {:ship/name "Weirdo"}]
         db     (-> (d/empty-db schema)
                    (d/db-with data))]
     
     (testing "derived attributes"
       (is (= #{{:ship/name "Roci" :ship/price 1000}
-               {:ship/name "Anubis" :ship/price 5000}}
+               {:ship/name "Anubis" :ship/price 5000}
+               {:ship/name "Weirdo"}}
              (set (pull-all db '[:ship/name :ship/price] read)))))
+
+    (testing "derived attributes on nested entities"
+      (is (= #{{:human/starships [{:ship/name "Roci" :ship/price 1000}]}
+               {:human/starships [{:ship/name "Anubis" :ship/price 5000}
+                                  {:ship/name "Roci" :ship/price 1000}]}}
+             (set (pull-all db '[{:human/starships [:ship/name :ship/price]}] read)))))
 
     (testing "clauses can be put on derived attributes as well"
       (is (= #{{:ship/name "Roci" :ship/price 1000}
