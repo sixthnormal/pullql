@@ -3,7 +3,8 @@
    [clojure.set :as set]
    [clojure.spec.alpha :as s]
    [datascript.core :as d]
-   [datascript.db :as db-internals])
+   [datascript.db :as db-internals]
+   [pullql.walk :as walk])
   #?(:clj (:import [datascript.db Datom])))
 
 ;; GRAMMAR
@@ -144,13 +145,15 @@
         (update :eid-filter comp (partial set/intersection (into #{} (map #(.-e %)) matching-datoms)))
         (update :entities #(reduce with-datom % matching-datoms)))))
 
+(defn- read-fn-unimplemented [attr db eids vals]
+  (throw (ex-info "No read-fn specified." {:attr attr
+                                           :eids eids
+                                           :vals vals})))
+
 ;; PUBLIC API
 
 (defn pull-all
-  ([db query] (pull-all db query (fn [attr db eids vals]
-                                   (throw (ex-info "No read-fn specified." {:attr attr
-                                                                            :eids eids
-                                                                            :vals vals})))))
+  ([db query] (pull-all db query read-fn-unimplemented))
   ([db query read-fn]
    (if-not (map? query)
      (pull-all db ::default-alias query read-fn)
@@ -172,6 +175,27 @@
                              entities)
          matching-entities (into [] (map extract-entity) (entity-filter (into #{} (keys entities))))]
      matching-entities)))
+
+(defn view-all!
+  ([conn name query then!] (view-all! conn name query read-fn-unimplemented then!))
+  ([conn name query read-fn then!]
+   (let [pattern      (parse-memoized query)
+         ;; Collect all attributes that this query depends on.
+         dependencies (walk/dependencies pattern)
+         ;; Do we need to pull :db/id at the top-level?
+         pull-eid?    (some #{[:attribute :db/id]} pattern)
+         maintain!    (fn [{:keys [db-after tx-data]}]
+                        (when (some dependencies (map :a tx-data))
+                          (let [ctx               (pull-pattern db-after read-fn pattern)
+                                ;; keep only matching entities
+                                entity-filter     (:eid-filter ctx)
+                                entities          (:entities ctx)
+                                extract-entity    (if pull-eid?
+                                                    (fn [eid] (assoc (entities eid) :db/id eid))
+                                                    entities)
+                                matching-entities (into [] (map extract-entity) (entity-filter (into #{} (keys entities))))]
+                            (then! db-after matching-entities))))]
+     (d/listen! conn name maintain!))))
 
 (defn merge-queries [& qs]
   (into [] (distinct) (apply concat qs)))

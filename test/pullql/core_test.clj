@@ -1,7 +1,7 @@
 (ns pullql.core-test
   (:require
    [clojure.test :refer [deftest is testing run-tests]]
-   [pullql.core :refer [parse pull-all derive-from-query]]
+   [pullql.core :refer [parse pull-all view-all! derive-from-query]]
    [datascript.core :as d]))
 
 (deftest test-parse
@@ -180,3 +180,31 @@
       (is (= #{{:ship/name "Roci" :ship/price 1000}}
              (set (pull-all db '[:ship/name
                                  [:ship/price 1000]] read)))))))
+
+(deftest test-view-all
+  (let [schema {:human/name      {}
+                :human/starships {:db/valueType   :db.type/ref
+                                  :db/cardinality :db.cardinality/many}
+                :ship/name       {}
+                :ship/class      {}}
+        data   [{:human/name      "Naomi Nagata"
+                 :human/starships [{:db/id -1 :ship/name "Roci" :ship/class :ship.class/fighter}
+                                   {:ship/name "Anubis" :ship/class :ship.class/science-vessel}]}
+                {:human/name      "Amos Burton"
+                 :human/starships [-1]}]
+        conn   (-> (d/empty-db schema)
+                   (d/conn-from-db))
+        query  '[:human/name
+                 {:human/starships [:ship/name
+                                    [:ship/class :ship.class/fighter]]}]]
+
+    (view-all! conn
+               ::test
+               query
+               (fn [db results]
+                 (is (= (pull-all db query) results))
+                 (println results)))
+    
+    (d/transact! conn data)
+
+    (d/transact! conn [[:db.fn/retractEntity 1]])))
