@@ -3,7 +3,7 @@
    [clojure.set :as set]
    [clojure.spec.alpha :as s]
    [datascript.core :as d]
-   [datascript.db :as db-internals]
+   [datascript.db :as db-internals :refer [datom-tx datom-added]]
    [pullql.walk :as walk])
   #?(:clj (:import [datascript.db Datom])))
 
@@ -77,7 +77,7 @@
      (is-derived? db attr) (read-fn attr db nil nil)
      (reverse-ref? attr)   (->> (d/datoms db :avet (reverse-ref attr))
                                 (sequence (map (fn [^Datom d]
-                                                 (db-internals/datom (.-v d) attr (.-e d) (.-tx d) (.-added d))))))
+                                                 (db-internals/datom (.-v d) attr (.-e d) (datom-tx d) (datom-added d))))))
      :else                 (d/datoms db :aevt attr)))
   ([db read-fn attr eids]
    (cond
@@ -86,7 +86,7 @@
                                 (sequence (comp
                                            (filter (fn [^Datom d] (contains? eids (.-v d))))
                                            (map (fn [^Datom d]
-                                                  (db-internals/datom (.-v d) attr (.-e d) (.-tx d) (.-added d)))))))
+                                                  (db-internals/datom (.-v d) attr (.-e d) (datom-tx d) (datom-added d)))))))
      :else                 (->> (d/datoms db :aevt attr)
                                 (sequence (filter (fn [^Datom d] (contains? eids (.-e d)))))))))
 
@@ -154,7 +154,7 @@
                            derived?     (read-fn attr db nil (when-not placeholder? #{v})) ; @TODO deal with eids here?
                            reverse?     (->> (d/datoms db :avet (reverse-ref attr))
                                              (sequence (map (fn [^Datom d]
-                                                              (db-internals/datom (.-v d) attr (.-e d) (.-tx d) (.-added d))))))
+                                                              (db-internals/datom (.-v d) attr (.-e d) (datom-tx d) (datom-added d))))))
                            placeholder? (d/datoms db :aevt attr)
                            indexed?     (d/datoms db :avet attr v)
                            :else        (->> (d/datoms db :aevt attr)
