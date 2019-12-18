@@ -34,19 +34,40 @@
 
 ;; INTERPRETER
 
-(defn- is-attr? [db attr property]
+(defn is-attr?
+  "Returns true iff the attribute is annotated with a property such as
+  `:db/index` or `:db.cardinality/many` in the schema."
+  [db attr property]
   (contains? (db-internals/-attrs-by db property) attr))
 
-(defn- is-derived? [db attr]
+(defn is-derived?
+  "Returns true iff the attribute is derived, rather than stored in the
+  database."
+  [db attr]
   (get-in db [:schema attr :db/derived]))
 
-(defn- reverse-ref? [attr]
+(defn reverse-ref?
+  "Returns true iff the attribute is a reverse reference, such as
+  `:parent/_child`."
+  [attr]
   (= \_ (nth (name attr) 0)))
 
-(defn reverse-ref [attr]
+(defn reverse-ref
+  "Returns the inverted reference. E.g. `:parent/child` becomes
+  `:parent/_child` and vice versa."
+  [attr]
   (if (reverse-ref? attr)
     (keyword (namespace attr) (subs (name attr) 1))
     (keyword (namespace attr) (str "_" (name attr)))))
+
+(defn normalized-ref
+  "Returns the version of a reference that is guaranteed to be contained
+  in the schema. E.g. `:parent/_child` is normalized to
+  `:parent/child`."
+  [attr]
+  (if (reverse-ref? attr)
+    (reverse-ref attr)
+    attr))
 
 (defmulti ^:private impl (fn [ctx node] (first node)))
 
