@@ -11,13 +11,11 @@
 (defmethod walk :expand [f state [_ map-spec]]
   (let [[attr pattern] (first map-spec)]
     (as-> state state
-      (f state [:attribute attr])
+      (f state [:expand map-spec])
       (walk f state [:pattern pattern]))))
 
 (defmethod walk :clause [f state [_ clause]]
-  (let [[_ data-pattern] clause
-        [attr v]         data-pattern]
-    (f state [:attribute attr])))
+  (f state [:clause clause]))
 
 ;; PUBLIC API
 
@@ -28,8 +26,12 @@
   "Returns a set of all aid's required to compute this pattern."
   [pattern]
   (fold (fn [aids [type data]]
-          (if (= type :attribute)
-            (conj aids data)
+          (case type
+            :attribute (conj aids data)
+            :expand    (let [[attr pattern] (first data)]
+                         (conj aids attr))
+            :clause    (let [[_ [attr v]] data]
+                         (conj aids attr))
             aids))
         #{}
         pattern))
