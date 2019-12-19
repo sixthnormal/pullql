@@ -1,4 +1,4 @@
-(defproject com.sixthnormal/pullql "0.1.0"
+(defproject com.sixthnormal/pullql "0.1.1"
   :description "A GraphQL-like DataScript query language."
   :license {:name "EPL-2.0"}
   :url "https://github.com/sixthnormal/pullql"

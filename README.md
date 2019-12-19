@@ -1,18 +1,20 @@
-# Pull QL
+# PullQL
 
-An extension of Datomic's pull query language, optimized for execution
-across all entities in a Datomic/DataScript database. For many
-entities, it is between one and two orders of magnitude faster than
-`d/pull-many`. PullQL is thus intended to fill a similar role as
-GraphQL. 
+[![Clojars Project](https://img.shields.io/clojars/v/com.sixthnormal/pullql.svg)](https://clojars.org/com.sixthnormal/pullql)
+[![cljdoc badge](https://cljdoc.org/badge/com.sixthnormal/pullql)](https://cljdoc.org/d/com.sixthnormal/pullql/CURRENT)
+
+A GraphQL-like query language for DataScript, optimized for execution
+across many entities at once. For such use cases, it is between one
+and two orders of magnitude faster than `d/pull-many`. PullQL *should*
+work on Datomic databases as well.
 
 **Features**
 
-- [x] Basic pull functionality
+- [x] Basic pull-all queries
 - [x] Multiple top-level queries via aliases
 - [x] Filter clauses on both root entities and children
 - [x] Derived attributes
-- [x] ClojureScript support
+- [x] cljc (usable on back- and frontend)
 
 A previous iteration of this language is described in detail in [0].
 
