@@ -3,7 +3,7 @@
    [clojure.set :as set]
    [clojure.spec.alpha :as s]
    [datascript.core :as d]
-   [datascript.db :as db-internals :refer [datom-tx datom-added]]
+   [datascript.db :as db-internals :refer [datom-tx datom-added #?(:cljs Datom)]]
    [pullql.walk :as walk])
   #?(:clj (:import [datascript.db Datom])))
 
