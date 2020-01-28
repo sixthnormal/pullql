@@ -1,7 +1,8 @@
 (ns pullql.core
   (:require
    [clojure.set :as set]
-   [clojure.spec.alpha :as s]
+   #?(:clj [clojure.spec.alpha :as s]
+      :cljs [cljs.spec.alpha :as s])
    [datascript.core :as d]
    [datascript.db :as db-internals :refer [datom-tx datom-added #?(:cljs Datom)]]
    [pullql.walk :as walk])
